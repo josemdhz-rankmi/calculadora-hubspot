@@ -1,0 +1,15 @@
+{
+  "extensions": {
+    "crmCards": [
+      {
+        "id": "cotizador-saas",
+        "title": "Calculadora de Cotización",
+        "objectTypes": ["DEAL"],
+        "fetch": {
+          "targetUrl": "https://calculadora-hubspot.vercel.app/api/crm/v3/extensions/cards",
+          "method": "POST"
+        }
+      }
+    ]
+  }
+}
