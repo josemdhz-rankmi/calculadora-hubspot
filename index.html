@@ -1,0 +1,206 @@
+<div class="configuracion-calculadora">
+  <h2>Configuración</h2>
+
+  <!-- País (G23) -->
+  <div>
+    <label for="countrySelect">Mercado (G23):</label>
+    <select id="countrySelect">
+      <option value="" disabled selected>-- Elige un país --</option>
+      <option value="Chile">Chile</option>
+      <option value="Peru">Peru</option>
+      <option value="Mexico">Mexico</option>
+      <option value="Otro">Otro</option>
+    </select>
+  </div>
+
+  <!-- Moneda dependiente (G25) -->
+  <div>
+    <label for="currencySelect">Moneda (G25):</label>
+    <select id="currencySelect" disabled>
+      <option value="" disabled selected>-- Elige país primero --</option>
+    </select>
+  </div>
+
+  <!-- Frecuencia (G30) -->
+  <div>
+    <label for="freqSelect">Tipo de pago (G30):</label>
+    <select id="freqSelect">
+      <option value="" disabled selected>-- Elige frecuencia --</option>
+      <option value="Mensual">Mensual</option>
+      <option value="Trimestral">Trimestral</option>
+      <option value="Semestral">Semestral</option>
+      <option value="Anual">Anual</option>
+    </select>
+  </div>
+
+  <!-- Valor numérico G24 -->
+  <div>
+    <label for="inpG24">Cantidad de Empleados (G24):</label>
+    <input type="number" id="inpG24" step="any" />
+  </div>
+
+  <!-- Valor numérico G26 -->
+  <div>
+    <label for="inpG26">Número de contractors (G26):</label>
+    <input type="number" id="inpG26" step="any" />
+  </div>
+
+  <!-- Duración (G36) -->
+  <div>
+    <label for="selectG36">Duración del contrato (años) (G36):</label>
+    <select id="selectG36">
+      <option value="" disabled selected>-- Elige duración --</option>
+      <option value="1 año">1 año</option>
+      <option value="2 años">2 años</option>
+      <option value="3 años">3 años</option>
+    </select>
+  </div>
+
+  <button id="saveBtn">Calcular</button>
+  <p id="statusMsg"></p>
+
+  <div id="results" style="margin-top:20px;">
+    <h3>Resultados:</h3>
+
+    <div class="result-item">
+      <span class="label">Total Productos (G46):</span>
+      <span class="value" id="outG46">
+        <!-- Aquí se insertará: <span class="monto">$303.40</span> <span class="moneda">MXN</span> por Mes -->
+      </span>
+    </div>
+
+    <div class="result-item">
+      <span class="label">Descuento (G47):</span>
+      <span class="value" id="outG47">
+        <!-- Aquí se insertará: <span class="porcentaje">0.05%</span> -->
+      </span>
+    </div>
+
+    <div class="result-item">
+      <span class="label">Total Productos (G49):</span>
+      <span class="value" id="outG49">
+        <!-- Aquí se insertará igual que G46 -->
+      </span>
+    </div>
+
+    <div class="result-item">
+      <span class="label">Valor por empleado (G50):</span>
+      <span class="value" id="outG50">
+        <!-- Aquí se insertará: <span class="monto">$13.10</span> por empleado por Mes -->
+      </span>
+    </div>
+  </div>
+
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // === Configuración endpoint ===
+  const endpoint = "https://script.google.com/macros/s/AKfycbzcMJ4Xd6ZNgl6pRyrI6ryzu0bBznwXqgpkVfiv1-lJmTwD7Uc5nImYs9cDn1sbNLQ3dA/exec";
+
+  // Mapa país → monedas
+  const monedasPorPais = {
+    'Chile':  ['UF','USD'],
+    'Peru':   ['SOL','USD'],
+    'Mexico': ['MXN','USD'],
+    'Otro':   ['USD']
+  };
+
+  // === Referencias ===
+  const countryEl  = document.getElementById('countrySelect');
+  const currencyEl = document.getElementById('currencySelect');
+  const freqEl     = document.getElementById('freqSelect');
+  const inpG24     = document.getElementById('inpG24');
+  const inpG26     = document.getElementById('inpG26');
+  const selG36     = document.getElementById('selectG36');
+  const saveBtn    = document.getElementById('saveBtn');
+  const statusMsg  = document.getElementById('statusMsg');
+  const outG46     = document.getElementById('outG46');
+  const outG47     = document.getElementById('outG47');
+  const outG49     = document.getElementById('outG49');
+  const outG50     = document.getElementById('outG50');
+
+  // Helper: redondear a 2 decimales
+  function twoDecimals(x) {
+    return Number(x).toFixed(2);
+  }
+
+  // === 1) País → Moneda dependiente ===
+  countryEl.addEventListener('change', () => {
+    const pais = countryEl.value;
+    const opts = monedasPorPais[pais] || [];
+    currencyEl.innerHTML = '';
+    if (opts.length === 0) {
+      currencyEl.disabled = true;
+      currencyEl.appendChild(new Option('-- Sin opciones --',''));
+    } else {
+      currencyEl.disabled = false;
+      currencyEl.appendChild(new Option('-- Elige moneda --',''));
+      opts.forEach(mon => currencyEl.appendChild(new Option(mon, mon)));
+      currencyEl.selectedIndex = 1;
+    }
+  });
+
+  // === 2) Callback JSONP: writeAndRead + formateo HTML ===
+  window.handleWriteAndRead = function(resp) {
+    if (!resp.success) {
+      statusMsg.textContent = "Error: " + resp.error;
+      return;
+    }
+
+    // Valor y código de moneda
+    const code = currencyEl.value;
+    const v46  = resp.G46;
+    const v47  = resp.G47;
+    const v49  = resp.G49;
+    const v50  = resp.G50;
+
+    // G46: $X.XX CODE por Mes
+    outG46.innerHTML = 
+      `<span class="monto">$${twoDecimals(v46)}</span> ` +
+      `<span class="moneda">${code}</span> por Mes`;
+
+    // G47: X.XX%
+    outG47.innerHTML = 
+      `<span class="porcentaje">${twoDecimals(v47)}%</span>`;
+
+    // G49: $X.XX CODE por Mes
+    outG49.innerHTML = 
+      `<span class="monto">$${twoDecimals(v49)}</span> ` +
+      `<span class="moneda">${code}</span> por Mes`;
+
+    // G50: $X.XX por empleado por Mes
+    outG50.innerHTML = 
+      `<span class="monto">$${twoDecimals(v50)}</span> por empleado por Mes`;
+
+    statusMsg.textContent = "¡Guardado y resultados actualizados!";
+  };
+
+  // === 3) Al pulsar “Guardar” ===
+  saveBtn.addEventListener('click', () => {
+    if (!countryEl.value || !currencyEl.value || !freqEl.value) {
+      return alert("Debes seleccionar país, moneda y frecuencia.");
+    }
+    // Construir URL JSONP
+    const url = endpoint
+      + '?mode=writeAndRead'
+      + '&G23=' + encodeURIComponent(countryEl.value)
+      + '&G25=' + encodeURIComponent(currencyEl.value)
+      + '&G30=' + encodeURIComponent(freqEl.value)
+      + '&G24=' + encodeURIComponent(inpG24.value)
+      + '&G26=' + encodeURIComponent(inpG26.value)
+      + '&G36=' + encodeURIComponent(selG36.value)
+      + '&callback=handleWriteAndRead';
+
+    // Inyectar <script> JSONP
+    const script = document.createElement('script');
+    script.src = url;
+    script.onerror = () => statusMsg.textContent = "Error al guardar/leer datos.";
+    document.body.appendChild(script);
+  });
+});
+</script>
+
+
+
